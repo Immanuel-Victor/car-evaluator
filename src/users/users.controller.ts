@@ -1,23 +1,63 @@
-import { Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post, Query, Session, UseGuards } from '@nestjs/common';
 import { CreateUserDto } from './dtos/create-user.dto';
 import { UsersService } from './users.service';
 import { UpdateUserDto } from './dtos/update-user.dto';
-import { Serialize, SerializeInterceptor } from 'src/interceptors/serialize.interceptor';
+import { Serialize } from 'src/interceptors/serialize.interceptor';
 import { UserDto } from './dtos/user.dto';
-SerializeInterceptor
+import { AuthService } from './auth.service';
+import { CurrentUser } from './decorators/current-user.decorator';
+import { User } from './user.entity';
+import { AuthGuard } from 'src/guards/auth.guard';
 
 @Controller('auth')
+@Serialize(UserDto)
 export class UsersController {
-    constructor(private usersService: UsersService) {}
-    
-    @Post('/signup')
-    createUser(
-        @Body() body: CreateUserDto
-    ) {
-        return this.usersService.create(body.email, body.password)
+    constructor(
+        private usersService: UsersService,
+        private authService: AuthService,
+    ) {}
+
+    // @Get('whoami')
+    // whoAmI(@Session() session:any) {
+    //     return this.usersService.findOne(session.userId)
+    // }
+
+    @Get('whoami')
+    @UseGuards(AuthGuard)
+    whoAmI(@CurrentUser() user: User) {
+        return user;
+    }
+
+    @Post('/signout')
+    signOut(@Session() session:any) {
+        session.userId = null;
     }
     
-    @Serialize(UserDto)
+    @Post('/signup')
+    async signUp(
+        @Body() body: CreateUserDto,
+        @Session() session: any
+    ) {
+        const user = await this.authService.signup(body.email, body.password)
+
+        session.userId = user.id;
+
+        return user;
+    }
+
+    @Post('/signin')
+    async signIn(
+        @Body() body: CreateUserDto,
+        @Session() session: any
+    ) {
+
+        const user = await this.authService.signin(body.email, body.password)
+        
+        session.userId = user.id;
+
+        return user;
+    }
+    
     @Get(':id') 
     async findUser(@Param("id") id: string) {
         console.log("handler running")
@@ -28,7 +68,6 @@ export class UsersController {
         return user
     }
 
-    @Serialize(UserDto)
     @Get() 
     findAllUsers(@Query("email") email: string) {
         return this.usersService.find(email);
