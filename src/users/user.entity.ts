@@ -9,6 +9,9 @@ export class User {
     @Column()
     email: string;
 
+    @Column({ default: false })
+    admin: boolean;
+
     @Column()
     password: string;
 
